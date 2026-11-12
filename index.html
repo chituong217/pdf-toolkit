@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PDF Toolkit – Công cụ PDF miễn phí, không giới hạn</title>
+<meta name="description" content="Ghép, tách, nén, xoay, đánh số trang, watermark, ký tên, OCR, đặt mật khẩu cho PDF. Miễn phí, không giới hạn, xử lý ngay trên máy bạn.">
+<meta name="theme-color" content="#c8322a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PDF Toolkit">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#/" aria-label="Trang chủ PDF Toolkit">
+    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect width="32" height="32" rx="7" fill="currentColor"/><path d="M9 7h9l5 5v13H9z" fill="#fff"/><path d="M18 7v5h5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".35"/><rect x="11.5" y="17" width="9" height="1.8" rx=".9" fill="currentColor"/><rect x="11.5" y="20.8" width="6" height="1.8" rx=".9" fill="currentColor"/></svg>
+    <span>PDF Toolkit</span>
+  </a>
+  <span class="privacy" title="Mọi thao tác chạy ngay trong trình duyệt của bạn">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    File không bị tải lên đâu cả
+  </span>
+</header>
+
+<main id="app" tabindex="-1">
+  <noscript>Ứng dụng cần JavaScript để hoạt động.</noscript>
+</main>
+
+<footer class="foot">
+  Miễn phí · Không giới hạn · Dùng offline được sau lần mở đầu (nén và OCR tải thêm một lần khi dùng lần đầu)
+</footer>
+
+<div id="toasts" aria-live="polite"></div>
+
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
