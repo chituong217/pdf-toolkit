@@ -1,6 +1,7 @@
 // Bộ định tuyến + trang chủ.
 import { el, icon } from './util.js';
 import { mergeTool, splitTool, organizeTool, cropTool, img2pdfTool, pdf2imgTool } from './tools-basic.js';
+import { scanTool } from './tools-scan.js';
 import { compressTool, protectTool, watermarkTool, numbersTool, signTool, ocrTool } from './tools-adv.js';
 
 const TOOLS = [
@@ -8,6 +9,7 @@ const TOOLS = [
   { id: 'split', group: 'Tổ chức file', title: 'Tách / cắt PDF', desc: 'Trích trang, tách theo khoảng, mỗi trang một file.', icon: 'split', run: splitTool },
   { id: 'organize', group: 'Tổ chức file', title: 'Sắp xếp, xoay, xoá trang', desc: 'Xem thumbnail, kéo thả đổi thứ tự, xoay, xoá trang.', icon: 'organize', run: organizeTool },
   { id: 'crop', group: 'Tổ chức file', title: 'Cắt lề', desc: 'Cắt bớt viền trắng của các trang.', icon: 'crop', run: cropTool },
+  { id: 'scan', group: 'Chuyển đổi', title: 'Quét tài liệu', desc: 'Chụp giấy tờ, nắn thẳng, lọc cho rõ chữ rồi xuất PDF.', icon: 'scan', run: scanTool },
   { id: 'img2pdf', group: 'Chuyển đổi', title: 'Ảnh → PDF', desc: 'Biến ảnh JPG/PNG… thành PDF, chọn khổ giấy và lề.', icon: 'img2pdf', run: img2pdfTool },
   { id: 'pdf2img', group: 'Chuyển đổi', title: 'PDF → Ảnh', desc: 'Xuất từng trang ra PNG hoặc JPG chất lượng cao.', icon: 'pdf2img', run: pdf2imgTool },
   { id: 'compress', group: 'Tối ưu & bảo mật', title: 'Nén PDF', desc: 'Giảm dung lượng, giữ chữ hoặc nén cực mạnh.', icon: 'compress', run: compressTool },

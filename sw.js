@@ -1,7 +1,7 @@
 // Service worker: lưu cache để dùng offline. Tăng VERSION mỗi khi cập nhật ứng dụng.
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = 'pdf-toolkit-' + VERSION;
-const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/util.js', 'js/shared.js', 'js/pagegrid.js', 'js/pdfcore.js',
+const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/util.js', 'js/shared.js', 'js/pagegrid.js', 'js/tools-scan.js', 'js/pdfcore.js',
   'js/tools-basic.js', 'js/tools-adv.js', 'js/gs-worker.js', 'manifest.webmanifest', 'icons/icon.svg',
   'vendor/pdf-lib.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js'];
 
