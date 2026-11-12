@@ -33,7 +33,7 @@ export function pdfPicker({ onLoaded, onReset }) {
 }
 
 // Danh sách sắp xếp được: kéo thả hoặc nút lên/xuống.
-export function sortableList(items, renderBody, onChange) {
+export function sortableList(items, renderBody, onChange, onRemove) {
   const ul = el('ul', { class: 'flist' });
   let dragIdx = null;
   const changed = () => { refresh(); onChange && onChange(); };
@@ -45,7 +45,7 @@ export function sortableList(items, renderBody, onChange) {
         el('div', { class: 'btns', style: { gap: '4px', flexWrap: 'nowrap' } },
           el('button', { class: 'btn icon', title: 'Lên', 'aria-label': 'Lên', disabled: i === 0, onclick: () => { [items[i - 1], items[i]] = [items[i], items[i - 1]]; changed(); } }, icon('up', 16)),
           el('button', { class: 'btn icon', title: 'Xuống', 'aria-label': 'Xuống', disabled: i === items.length - 1, onclick: () => { [items[i + 1], items[i]] = [items[i], items[i + 1]]; changed(); } }, icon('down', 16)),
-          el('button', { class: 'btn icon danger', title: 'Bỏ', 'aria-label': 'Bỏ', onclick: () => { items.splice(i, 1); changed(); } }, icon('x', 16))));
+          el('button', { class: 'btn icon danger', title: 'Bỏ', 'aria-label': 'Bỏ', onclick: () => { const [gone] = items.splice(i, 1); onRemove && onRemove(gone); changed(); } }, icon('x', 16))));
       li.addEventListener('dragstart', (e) => { dragIdx = i; li.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch (_) {} });
       li.addEventListener('dragend', () => li.classList.remove('dragging'));
       li.addEventListener('dragover', (e) => e.preventDefault());

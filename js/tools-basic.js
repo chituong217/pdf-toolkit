@@ -2,6 +2,7 @@
 import { el, icon, dropzone, readBytes, fmtSize, baseName, busy, progressBar, toast, parseRanges, flatRange, sleep } from './util.js';
 import { PDFDocument, degrees, loadDoc, openRender, renderPage, canvasToBlob, freeCanvas, pageFrame, saveDoc, pdfBlob } from './pdfcore.js';
 import { pdfPicker, sortableList, showOutputs, field, select, check, seg } from './shared.js';
+import { makeThumbs, thumbObserver, openLightbox } from './pagegrid.js';
 
 const PDF = 'application/pdf';
 const mm = (v) => v * 72 / 25.4;
@@ -12,12 +13,40 @@ export function mergeTool(root) {
   const out = el('div');
   const prog = progressBar();
   const runBtn = el('button', { class: 'btn primary', disabled: true }, 'Ghép thành 1 file PDF');
-  const list = sortableList(items, (it) => el('div', { class: 'nm' }, el('b', {}, it.name), el('small', {}, `${it.pages} trang · ${fmtSize(it.size)}`)), update);
+  // Mỗi dòng: hình trang đầu + tên + nút "Xem các trang" mở dải hình thu nhỏ của cả file.
+  function renderItem(it) {
+    if (!it.thumbs) it.thumbs = makeThumbs(it.bytes);
+    if (it.ob) it.ob.disconnect();
+    const first = el('img', { class: 'th', alt: 'Trang 1 của ' + it.name, title: 'Bấm để xem lớn' });
+    it.thumbs.thumb(0).then(u => { if (u) first.src = u; });
+    first.addEventListener('click', () => openLightbox(it.thumbs, it.pages, 0, it.name));
+    const toggle = el('button', { class: 'btn small', onclick: () => { it.open = !it.open; list.refresh(); } },
+      icon(it.open ? 'up' : 'down', 14), it.open ? 'Thu gọn' : 'Xem các trang');
+    const head = el('div', { class: 'mhead' }, first,
+      el('div', { class: 'nm' }, el('b', {}, it.name), el('small', {}, `${it.pages} trang · ${fmtSize(it.size)}`)));
+    const body = el('div', { class: 'mbody' }, head, el('div', {}, toggle));
+    const frag = document.createDocumentFragment();
+    frag.append(body);
+    if (it.open) {
+      const ob = it.ob = thumbObserver(it.thumbs);
+      const strip = el('div', { class: 'mstrip' });
+      for (let i = 0; i < it.pages; i++) {
+        const img = el('img', { alt: 'Trang ' + (i + 1) });
+        const card = el('button', { class: 'mpage', title: 'Bấm để xem lớn', onclick: () => openLightbox(it.thumbs, it.pages, i, it.name) }, img, el('span', {}, String(i + 1)));
+        strip.append(card);
+        ob.watch(card, img, i);
+      }
+      frag.append(strip);
+    }
+    return frag;
+  }
+  const dropItem = (it) => { if (it.ob) it.ob.disconnect(); if (it.thumbs) it.thumbs.destroy(); };
+  const list = sortableList(items, renderItem, update, dropItem);
   const listPanel = el('div', { class: 'panel', style: { display: 'none' } },
     el('h3', {}, 'Thứ tự ghép (kéo thả hoặc dùng mũi tên)'), list.root,
     el('div', { class: 'btns', style: { marginTop: '12px' } },
       el('button', { class: 'btn small', onclick: () => { items.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true })); list.refresh(); } }, 'Sắp xếp theo tên'),
-      el('button', { class: 'btn small danger', onclick: () => { items.length = 0; list.refresh(); update(); } }, 'Xoá hết')));
+      el('button', { class: 'btn small danger', onclick: () => { items.forEach(dropItem); items.length = 0; list.refresh(); update(); } }, 'Xoá hết')));
 
   function update() {
     listPanel.style.display = items.length ? '' : 'none';
@@ -60,36 +89,114 @@ export function mergeTool(root) {
 }
 
 /* ================= TÁCH FILE ================= */
+// Rút gọn danh sách trang đã chọn thành chuỗi khoảng: [0,1,2,4] -> "1-3, 5".
+function toRangeText(set) {
+  const a = [...set].sort((x, y) => x - y), parts = [];
+  for (let i = 0; i < a.length;) {
+    let j = i; while (j + 1 < a.length && a[j + 1] === a[j] + 1) j++;
+    parts.push(j > i ? `${a[i] + 1}-${a[j] + 1}` : String(a[i] + 1)); i = j + 1;
+  }
+  return parts.join(', ');
+}
+
 export function splitTool(root) {
-  let info = null;
+  let info = null, thumbs = null, obs = null;
   const out = el('div'), prog = progressBar();
   const opts = el('div', { class: 'panel', style: { display: 'none' } });
 
+  const cleanup = () => { if (obs) obs.disconnect(); if (thumbs) thumbs.destroy(); obs = thumbs = null; };
   const picker = pdfPicker({
-    onLoaded: (i) => { info = i; drawOpts(); },
-    onReset: () => { info = null; opts.style.display = 'none'; out.replaceChildren(); },
+    onLoaded: (i) => { cleanup(); info = i; thumbs = makeThumbs(i.bytes); drawOpts(); },
+    onReset: () => { cleanup(); info = null; opts.style.display = 'none'; opts.replaceChildren(); out.replaceChildren(); },
   });
 
   function drawOpts() {
     let mode = 'extract';
-    const rangeIn = el('input', { type: 'text', placeholder: 'Ví dụ: 1-3, 5, 8-', value: '1' });
+    const sel = new Set();
+    const rangeIn = el('input', { type: 'text', placeholder: 'Bấm chọn trang bên dưới, hoặc gõ: 1-3, 5, 8-', value: '' });
     const nIn = el('input', { type: 'number', min: '1', value: '1' });
     const rangeField = field('Các trang / khoảng trang', rangeIn, `File có ${info.pages} trang. Dùng dấu phẩy để ngăn cách, "8-" nghĩa là từ trang 8 đến hết.`);
     const nField = field('Số trang mỗi file', nIn);
     const desc = el('p', { class: 'hint' });
+
+    /* --- Lưới chọn trang --- */
+    const grid = el('div', { class: 'pgrid pick-grid' });
+    const count = el('span', { class: 'hint' });
+    const cards = [], boxes = [];
+    obs = thumbObserver(thumbs);
+    let anchor = null, dragVal = null;
+    const refreshCount = () => { count.textContent = sel.size ? `Đã chọn ${sel.size}/${info.pages} trang` : 'Chưa chọn trang nào'; };
+    function paint(i) { const on = sel.has(i); cards[i].classList.toggle('sel', on); boxes[i].checked = on; }
+    function writeText() { rangeIn.value = toRangeText(sel); refreshCount(); }
+    function setSel(i, on) { if (on) sel.add(i); else sel.delete(i); paint(i); writeText(); }
+    function setMany(idx, on) { for (const i of idx) { if (on) sel.add(i); else sel.delete(i); paint(i); } writeText(); }
+    const all = () => Array.from({ length: info.pages }, (_, i) => i);
+    function endDrag() { dragVal = null; window.removeEventListener('pointerup', endDrag); window.removeEventListener('pointercancel', endDrag); }
+
+    for (let i = 0; i < info.pages; i++) {
+      const img = el('img', { alt: 'Trang ' + (i + 1), draggable: 'false' });
+      const pick = el('input', { type: 'checkbox', class: 'pick', 'aria-label': 'Chọn trang ' + (i + 1),
+        onchange: (e) => { setSel(i, e.target.checked); anchor = i; } });
+      pick.addEventListener('pointerdown', (e) => e.stopPropagation());
+      const zoom = el('button', { class: 'btn icon zoom', title: 'Xem lớn', 'aria-label': 'Xem lớn trang ' + (i + 1),
+        onclick: (e) => { e.stopPropagation(); openLightbox(thumbs, info.pages, i, info.name); } }, icon('zoom', 14));
+      zoom.addEventListener('pointerdown', (e) => e.stopPropagation());
+      const card = el('div', { class: 'pcard selectable' }, pick, zoom, el('div', { class: 'box' }, img), el('div', { class: 'n' }, 'Trang ' + (i + 1)));
+      // Chuột: bấm để chọn, kéo qua các trang để chọn cả dải, Shift+bấm chọn từ trang trước đó.
+      card.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'mouse' || e.button !== 0) return;
+        e.preventDefault();
+        if (e.shiftKey && anchor != null) {
+          const [a, b] = anchor < i ? [anchor, i] : [i, anchor];
+          setMany(Array.from({ length: b - a + 1 }, (_, k) => a + k), true);
+        } else {
+          dragVal = !sel.has(i); setSel(i, dragVal); anchor = i;
+          window.addEventListener('pointerup', endDrag); window.addEventListener('pointercancel', endDrag);
+        }
+      });
+      card.addEventListener('pointerenter', (e) => { if (dragVal != null && e.pointerType === 'mouse' && (e.buttons & 1)) setSel(i, dragVal); });
+      // Cảm ứng: chạm một lần để chọn (cuộn trang không bị tính là chạm).
+      card.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') { setSel(i, !sel.has(i)); anchor = i; } });
+      card.addEventListener('dblclick', () => openLightbox(thumbs, info.pages, i, info.name));
+      cards.push(card); boxes.push(pick);
+      grid.append(card);
+      obs.watch(card, img, i);
+    }
+    const tb = el('div', { class: 'btns', style: { marginBottom: '10px' } },
+      el('button', { class: 'btn small', onclick: () => setMany(all(), true) }, 'Chọn tất cả'),
+      el('button', { class: 'btn small', onclick: () => setMany(all(), false) }, 'Bỏ chọn'),
+      el('button', { class: 'btn small', onclick: () => { const cur = new Set(sel); setMany(all(), false); setMany(all().filter(i => !cur.has(i)), true); } }, 'Đảo chọn'),
+      el('button', { class: 'btn small', onclick: () => setMany(all().filter(i => (i + 1) % 2 === 1), true) }, 'Trang lẻ'),
+      el('button', { class: 'btn small', onclick: () => setMany(all().filter(i => (i + 1) % 2 === 0), true) }, 'Trang chẵn'));
+    const gridBox = el('div', {},
+      el('p', { class: 'hint', style: { margin: '0 0 8px' } }, 'Bấm vào trang để chọn, kéo chuột qua nhiều trang để chọn cả dải, Shift+bấm để chọn từ trang trước đó. Bấm biểu tượng kính lúp (hoặc bấm đúp) để xem lớn.'),
+      tb, count, el('div', { style: { height: '8px' } }), grid);
+
+    // Gõ tay vào ô trang thì lưới chọn theo; gõ chưa hợp lệ thì giữ nguyên lưới.
+    rangeIn.addEventListener('input', () => {
+      let next = null;
+      try { next = new Set(parseRanges(rangeIn.value, info.pages).flat()); } catch (_) { if (!rangeIn.value.trim()) next = new Set(); }
+      if (!next) return;
+      sel.clear(); next.forEach(i => sel.add(i));
+      for (let i = 0; i < info.pages; i++) paint(i);
+      refreshCount();
+    });
+
     const modes = [
       ['extract', 'Trích các trang ra 1 file'],
       ['ranges', 'Tách mỗi khoảng thành 1 file'],
       ['each', 'Mỗi trang 1 file'],
       ['every', 'Chia mỗi N trang'],
     ];
-    const sel = select(modes, mode, (v) => { mode = v; sync(); });
+    const modeSel = select(modes, mode, (v) => { mode = v; sync(); });
     function sync() {
-      rangeField.style.display = (mode === 'extract' || mode === 'ranges') ? '' : 'none';
+      const useRange = mode === 'extract' || mode === 'ranges';
+      rangeField.style.display = useRange ? '' : 'none';
+      gridBox.style.display = useRange ? '' : 'none';
       nField.style.display = mode === 'every' ? '' : 'none';
       desc.textContent = {
-        extract: 'Gộp các trang bạn nhập thành một file PDF mới (giữ đúng thứ tự bạn gõ).',
-        ranges: 'Mỗi khoảng cách nhau bằng dấu phẩy sẽ thành một file riêng, ví dụ "1-3, 4-6" ra 2 file.',
+        extract: 'Gộp các trang đã chọn thành một file PDF mới (giữ đúng thứ tự bạn gõ).',
+        ranges: 'Mỗi khoảng cách nhau bằng dấu phẩy sẽ thành một file riêng, ví dụ "1-3, 4-6" ra 2 file. Các trang liền nhau chọn từ lưới sẽ thành một khoảng, muốn chia nhỏ hơn hãy gõ tay.',
         each: `Tạo ${info.pages} file, mỗi file 1 trang, đóng gói thành .zip.`,
         every: 'Chia đều thành nhiều file, mỗi file N trang (file cuối có thể ít hơn).',
       }[mode];
@@ -120,8 +227,9 @@ export function splitTool(root) {
       prog.hide();
       showOutputs(out, outputs, { zipName: base + '_tach.zip', title: outputs.length === 1 ? 'Đã trích xong' : `Đã tách thành ${outputs.length} file` });
     }));
-    opts.replaceChildren(el('div', { class: 'stack' }, field('Cách tách', sel), rangeField, nField, desc, el('div', {}, runBtn), prog.root));
+    opts.replaceChildren(el('div', { class: 'stack' }, field('Cách tách', modeSel), rangeField, gridBox, nField, desc, el('div', {}, runBtn), prog.root));
     opts.style.display = '';
+    refreshCount();
     sync();
   }
   root.append(picker, opts, out);
